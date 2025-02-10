@@ -68,18 +68,18 @@ class PokemonTableViewCell: UITableViewCell {
             // Nome in alto a destra
             nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             nameLabel.leadingAnchor.constraint(equalTo: pokemonImageView.trailingAnchor, constant: 8),
-            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: 0),
             
             // Stack view per i tipi subito sotto il nome
             typesStackView.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
             typesStackView.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            typesStackView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -8),
+            typesStackView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: 0),
             
             // Descrizione sotto la stack view
             descriptionLabel.topAnchor.constraint(equalTo: typesStackView.bottomAnchor, constant: 4),
             descriptionLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
             descriptionLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
-            descriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -8)
+            descriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: 0)
             
             
         ])
@@ -119,5 +119,13 @@ class PokemonTableViewCell: UITableViewCell {
         } else {
             pokemonImageView.image = nil
         }
+    }
+    
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        // Resetta i contenuti al loro stato predefinito
+        self.pokemonImageView.image = nil
+        self.nameLabel.text = nil
+        self.descriptionLabel.text = nil
     }
 }
