@@ -1,0 +1,25 @@
+{
+  "configurations" : [
+    {
+      "id" : "B84E1F6C-FF88-4916-B9E9-53DF78CF8ADA",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:PokemonBox.xcodeproj",
+        "identifier" : "19D182972D57C80D00E4E4EB",
+        "name" : "PokemonBoxTests"
+      }
+    }
+  ],
+  "version" : 1
+}

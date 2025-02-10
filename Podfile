@@ -6,7 +6,6 @@ target 'PokemonBox' do
   use_frameworks!
 
   # Pods for PokemonBox
-    pod 'SVProgressHUD', '2.3.1'
 
   target 'PokemonBoxTests' do
     inherit! :search_paths

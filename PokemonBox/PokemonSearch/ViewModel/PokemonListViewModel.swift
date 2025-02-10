@@ -21,32 +21,19 @@ class PokemonSearchViewModel: PokemonSearchViewModelProtocol {
     }
     
     // MARK: - Caricamento dati paginato
-        private func loadMorePokemon() {
+        func loadMorePokemon() {
             guard !(view?.isLoadingPage ?? true), !(view?.isAllPagesLoaded ?? true) else { return }
             view?.isLoadingPage = true
             
             // Registra il tempo d'inizio per garantire che la view rimanga visibile almeno 1 secondo
             let loadStartTime = Date()
             
-            // Blocca lo scrolling della tableView e mostra la loadingContainerView
-            DispatchQueue.main.async {
-                // Se la tableView sta già decelerando, fermiamo l'inerzia
-                self.tableView.setContentOffset(self.tableView.contentOffset, animated: false)
-                self.tableView.isScrollEnabled = false
-                self.tableView.panGestureRecognizer.isEnabled = false
-                
-                self.loadingContainerView.isHidden = false
-                self.loadingActivityIndicator.startAnimating()
-            }
+            // Blocca la view
+            self.view?.dataLoadingStarted()
             
-            let urlString = "https://pokeapi.co/api/v2/pokemon?limit=\(pageLimit)&offset=\(currentOffset)"
+            let urlString = "https://pokeapi.co/api/v2/pokemon?limit=\(self.view?.pageLimit ?? 0)&offset=\(self.view?.currentOffset ?? 0)"
             guard let url = URL(string: urlString) else {
-                DispatchQueue.main.async {
-                    self.stopLoadingIndicator(minimumTimeFrom: loadStartTime)
-                    self.tableView.isScrollEnabled = true
-                    self.tableView.panGestureRecognizer.isEnabled = true
-                }
-                isLoadingPage = false
+                
                 return
             }
             
@@ -54,74 +41,56 @@ class PokemonSearchViewModel: PokemonSearchViewModelProtocol {
                 guard let self = self else { return }
                 if let error = error {
                     print("Errore nel caricamento: \(error)")
-                    DispatchQueue.main.async {
-                        self.stopLoadingIndicator(minimumTimeFrom: loadStartTime)
-                        self.tableView.isScrollEnabled = true
-                        self.tableView.panGestureRecognizer.isEnabled = true
-                    }
-                    self.isLoadingPage = false
+                    self.view?.dataLoadingFinished(loadStartTime: loadStartTime, success: false)
                     return
                 }
                 guard let data = data else {
-                    DispatchQueue.main.async {
-                        self.stopLoadingIndicator(minimumTimeFrom: loadStartTime)
-                        self.tableView.isScrollEnabled = true
-                        self.tableView.panGestureRecognizer.isEnabled = true
-                    }
-                    self.isLoadingPage = false
+                    self.view?.dataLoadingFinished(loadStartTime: loadStartTime, success: false)
                     return
                 }
                 do {
                     let response = try JSONDecoder().decode(PokemonListResponse.self, from: data)
                     let newPokemon = response.results
-                    if newPokemon.count < self.pageLimit {
-                        self.isAllPagesLoaded = true
+                    if newPokemon.count < self.view?.pageLimit ?? 0 {
+                        self.view?.isAllPagesLoaded = true
                     }
-                    self.paginatedPokemon.append(contentsOf: newPokemon)
-                    self.currentOffset += self.pageLimit
+                    self.view?.paginatedPokemon.append(contentsOf: newPokemon)
+                    self.view?.currentOffset += self.view?.pageLimit ?? 0
                     
                     var counter = 0
+                    var successCount = 0
                     for pokemon in newPokemon {
                         fetchPokemonDetail(for: pokemon) { detail in
+                            counter += 1
                             if detail != nil {
-                                counter += 1
-                                if counter == newPokemon.count {
-                                    DispatchQueue.main.async {
-                                        self.tableView.reloadData()
-                                        self.stopLoadingIndicator(minimumTimeFrom: loadStartTime)
-                                        self.tableView.isScrollEnabled = true
-                                        self.tableView.panGestureRecognizer.isEnabled = true
-                                    }
-                                    self.isLoadingPage = false
-                                }
+                                successCount += 1
+                            }
+                            if counter == newPokemon.count {
+                                // Se tutti i dettagli sono stati caricati correttamente, segnala successo;
+                                // altrimenti, segnala fallimento.
+                                let overallSuccess = (successCount == newPokemon.count)
+                                self.view?.dataLoadingFinished(loadStartTime: loadStartTime, success: overallSuccess)
                             }
                         }
                     }
 
+
                 } catch {
                     print("Errore di decodifica: \(error)")
-                    DispatchQueue.main.async {
-                        self.stopLoadingIndicator(minimumTimeFrom: loadStartTime)
-                        self.tableView.isScrollEnabled = true
-                        self.tableView.panGestureRecognizer.isEnabled = true
-                    }
-                    self.isLoadingPage = false
+                    self.view?.dataLoadingFinished(loadStartTime: loadStartTime, success: false)
                 }
             }.resume()
         }
     
     /// Per la modalità ricerca: carica la lista completa dei Pokémon (se non già scaricata)
-    private func searchPokemonWithName(name: String, completion: @escaping () -> Void) {
+    func searchPokemonWithName(name: String, completion: @escaping () -> Void) {
 
-        SVProgressHUD.show()
         let urlString = "https://pokeapi.co/api/v2/pokemon/\(name.lowercased())"
         guard let url = URL(string: urlString) else {
-            SVProgressHUD.dismiss()
             completion()
             return
         }
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            DispatchQueue.main.async { SVProgressHUD.dismiss() }
             guard let self = self else { return }
             if let error = error {
                 print("Errore nella ricerca del Pokemon digitato dall'utente: \(error)")
@@ -140,16 +109,16 @@ class PokemonSearchViewModel: PokemonSearchViewModelProtocol {
                    let forms = formsString.first,
                    let formsData = try? JSONSerialization.data(withJSONObject: forms, options: []),
                    let pokemonBasicData = try? JSONDecoder().decode(PokemonBasic.self, from: formsData){
-                    searchResult = pokemonBasicData
+                    self.view?.searchResult = pokemonBasicData
                     fetchPokemonDetail(for: pokemonBasicData) { detailModel in
                         completion()
                     }
                 } else {
-                    searchResult = nil
+                    self.view?.searchResult = nil
                 }
             } catch {
                 print("Errore di decodifica: \(error)")
-                searchResult = nil
+                self.view?.searchResult = nil
                 completion()
                 return
             }
@@ -159,7 +128,7 @@ class PokemonSearchViewModel: PokemonSearchViewModelProtocol {
     }
     
     /// Carica i dettagli di un Pokémon (immagine, tipi e descrizione)
-    private func fetchPokemonDetail(for pokemon: PokemonBasic, completion: @escaping (PokemonDetailModel?) -> Void) {
+    func fetchPokemonDetail(for pokemon: PokemonBasic, completion: @escaping (PokemonDetailModel?) -> Void) {
         // 1. Chiamata a /pokemon/<name> per ottenere sprites e tipi
         guard let url = URL(string: pokemon.url) else {
             completion(nil)
@@ -207,9 +176,9 @@ class PokemonSearchViewModel: PokemonSearchViewModelProtocol {
                             description: flavorText
                         )
                         // Cache: memorizziamo il risultato
-                        DispatchQueue.main.async {
-                            self?.pokemonDetailsCache[pokemon.name] = detail
-                        }
+                        
+                        self?.view?.pokemonDetailsCache[pokemon.name] = detail
+                        
                         completion(detail)
                     } catch {
                         print("Errore di decodifica specie: \(error)")

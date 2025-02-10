@@ -6,19 +6,21 @@
 //
 
 import UIKit
-import SVProgressHUD
 
 protocol PokemonSearchView : AnyObject {
+    // MARK: - Variabili per i dati della view esposte
     var paginatedPokemon: [PokemonBasic] {get set}
-
     var searchResult: PokemonBasic? {get set}
-    
     var pokemonDetailsCache: [String: PokemonDetailModel] {get set}
 
     var currentOffset : Int {get set}
     var pageLimit : Int {get}
     var isLoadingPage : Bool {get set}
     var isAllPagesLoaded : Bool {get set}
+    
+    // MARK: - Funzioni della view esposte
+    func dataLoadingStarted()
+    func dataLoadingFinished(loadStartTime: Date, success: Bool)
 }
 
 class PokemonSearchViewController: UIViewController {
@@ -99,7 +101,6 @@ class PokemonSearchViewController: UIViewController {
         view.backgroundColor = .white
         title = "PokémonBox"
         
-        SVProgressHUD.setDefaultMaskType(.none)
         setupUI()
         
         searchBar.delegate = self
@@ -107,7 +108,6 @@ class PokemonSearchViewController: UIViewController {
         tableView.dataSource = self
         tableView.register(PokemonTableViewCell.self, forCellReuseIdentifier: PokemonTableViewCell.identifier)
         
-
         viewModel = PokemonSearchViewModel(view: self)
     }
     
@@ -167,7 +167,30 @@ class PokemonSearchViewController: UIViewController {
 }
 
 extension PokemonSearchViewController: PokemonSearchView {
+    func dataLoadingStarted() {
+        // Blocca lo scrolling della tableView e mostra la loadingContainerView
+        DispatchQueue.main.async {
+            // Se la tableView sta già decelerando, fermiamo l'inerzia
+            self.tableView.setContentOffset(self.tableView.contentOffset, animated: false)
+            self.tableView.isScrollEnabled = false
+            self.tableView.panGestureRecognizer.isEnabled = false
+            
+            self.loadingContainerView.isHidden = false
+            self.loadingActivityIndicator.startAnimating()
+        }
+    }
     
+    func dataLoadingFinished(loadStartTime: Date, success: Bool) {
+        DispatchQueue.main.async {
+            self.stopLoadingIndicator(minimumTimeFrom: loadStartTime)
+            if success {
+                self.tableView.reloadData()
+            }
+            self.tableView.isScrollEnabled = true
+            self.tableView.panGestureRecognizer.isEnabled = true
+        }
+        isLoadingPage = false
+    }
 }
 
 // MARK: - UISearchBarDelegate
@@ -178,7 +201,7 @@ extension PokemonSearchViewController: UISearchBarDelegate {
             searchResult = nil
             tableView.reloadData()
         } else {
-            viewModel.searchPokemonWithName(name: searchText) {
+            viewModel?.searchPokemonWithName(name: searchText) {
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
                 }
@@ -186,16 +209,6 @@ extension PokemonSearchViewController: UISearchBarDelegate {
         }
     }
     
-//    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-//        searchBar.resignFirstResponder()
-//        let searchText = searchBar.text ?? ""
-//        searchPokemonWithName(name: searchText) {
-//            DispatchQueue.main.async {
-//                self.tableView.reloadData()
-//            }
-//        }
-//        
-//    }
 }
 
 // MARK: - UITableViewDataSource & UITableViewDelegate
@@ -211,21 +224,16 @@ extension PokemonSearchViewController: UITableViewDataSource, UITableViewDelegat
             return UITableViewCell()
         }
         
-        cell.pokemonImageView.image = nil
-        
         var pokemon: PokemonBasic
-        
         if isSearchMode {
             guard let result = searchResult else {
                 return UITableViewCell()
             }
             pokemon = result
-            
         } else {
             pokemon = paginatedPokemon[indexPath.row]
         }
 
-        
         if let detail = pokemonDetailsCache[pokemon.name] {
             cell.configure(with: detail)
         }
